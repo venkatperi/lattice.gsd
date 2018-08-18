@@ -259,7 +259,7 @@ parser.add_argument("-s", "--size",
 parser.add_argument("-e", "--evolutions",
                     type=int,
                     help="Number of times the lattice evolves",
-                    required=True)
+                    default=0)
 
 args = parser.parse_args()
 
