@@ -11,6 +11,7 @@ import numpy as np
 from numpy.random import rand as r
 from collections import defaultdict as d, defaultdict
 from PIL import Image
+import argparse
 
 RED = 0.2295
 BLUE = 0.00254
@@ -166,24 +167,18 @@ class Lattice(object):
                         neighborhood[neighborhood != self.lattice[i, j]])
 
                 # KILLING..........##########
-                if self.onlyRedBlue and self.lattice[i, j] == RED:  # site is filled with red bact
-                    # if your lattice is one dimensional
-                    if self.x == 1:
-                        thresh = .5
-                    else:
-                        thresh = 2
 
+                # if your lattice is one dimensional
+                thresh = 0.5 if self.x == 1 else 2
+
+                # site is filled with red bact
+                if self.onlyRedBlue and self.lattice[i, j] == RED:
                     # if number of blue cells * their killing advantage * random number > 2,
                     # kill this red bacteria (replace with empty site)
-                    if n_blue * r() * self.blueAdvantage > thresh:
-                        if not self.defKillers:
-                            self.lattice[i, j] = 0  # kill this bacteria
+                    if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
+                        self.lattice[i, j] = 0
 
                 elif self.onlyRedBlue and self.lattice[i, j] == BLUE:  # site is filled with a blue bacteria
-                    if self.x == 1:
-                        thresh = .5
-                    else:
-                        thresh = 2
                     if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
                         self.lattice[i, j] = 0  # kill this bacteria
 
@@ -199,7 +194,8 @@ class Lattice(object):
                                 pass
                                 # enemy_weight=enemy_weight+self.killdict[enemy][0];
 
-                    if enemy_weight * r() > 2:  # if enough enemies, kill this bacterium
+                    # if enough enemies, kill this bacterium
+                    if enemy_weight * r() > 2:
                         self.lattice[i, j] = 0
 
                     # FILLING ....... #########
@@ -234,7 +230,6 @@ class Lattice(object):
                             choices = np.array(choices)
                             self.lattice[i, j] = np.random.choice(choices, p=choices2)
                             # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
-        return
 
     def view(self):
         """
@@ -255,7 +250,25 @@ class Lattice(object):
         return imu
 
 
-my_lattice = Lattice(size=50, slider=0, onlyRedBlue=True, numRatio=20, deathRate=100000)
+parser = argparse.ArgumentParser()
+parser.add_argument("-s", "--size",
+                    type=int,
+                    help="Size of the lattice (size x size)",
+                    default=100)
+
+parser.add_argument("-e", "--evolutions",
+                    type=int,
+                    help="Number of times the lattice evolves",
+                    required=True)
+
+args = parser.parse_args()
+
+print "Lattice size is: %d\nNumber of evolutions is: %d" % (args.size, args.evolutions)
+
+my_lattice = Lattice(size=args.size, slider=0, onlyRedBlue=True, numRatio=20, deathRate=100000)
+for iteration in range(0, args.evolutions):
+    my_lattice.evolve(1)
+
 # my_lattice.view()
 im = my_lattice.view()
 im.show()
