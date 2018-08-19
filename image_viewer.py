@@ -1,5 +1,7 @@
 import pygame
 
+from StreamingMovingAverage import StreamingMovingAverage
+
 BG_COLOR = (20, 20, 20)
 FONT_NAME = "font/RobotoMono-Regular.ttf"
 FONT_SIZE = 12
@@ -7,14 +9,17 @@ TEXT_COLOR = (200, 200, 200)
 
 
 class ImageViewer(object):
-    def __init__(self, width, height, runner, border=40,
-                 caption="ImageViewer", autoStop=False):
+    def __init__(self, width, height, runner, border=50,
+                 updateRate=60,
+                 caption="ImageViewer",
+                 autoStop=False):
 
         pygame.init()
         self.width = width
         self.height = height
         self.runner = runner
         self.border = border
+        self.updateRate = updateRate
         self.screen = pygame.display.set_mode(
             (width + (2 * border), height + (2 * border)),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
@@ -25,6 +30,8 @@ class ImageViewer(object):
         self.frame_count = 0
         self.done = False
         self.autoStop = autoStop
+        self.prevGeneration = 0
+        self.average = StreamingMovingAverage(100)
 
         # clear screen
         self.screen.fill(BG_COLOR)
@@ -52,20 +59,26 @@ class ImageViewer(object):
                         pygame.quit()
                         return
 
-            self.screen.fill(BG_COLOR)
-            # self.screen.fill(BG_COLOR, (0, 0, self.width, self.border))
-            # self.screen.fill(BG_COLOR, (0, self.height + self.border, self.width, self.border))
+            lattice = self.runner.lattice
+            lattice.lock.acquire()
 
-            # Convert to a surface and splat onto screen offset by border width and height
-            surface = pygame.surfarray.make_surface(self.runner.lattice.to_rgb_image())
+            diff = lattice.generation - self.prevGeneration
+            self.prevGeneration = lattice.generation
+            average, gps = self.average.process(diff, pygame.time.get_ticks())
+
+            self.clock.tick(self.updateRate)
+            self.screen.fill(BG_COLOR)
+
+            surface = pygame.surfarray.make_surface(lattice.to_rgb_image())
             self.screen.blit(surface, (self.border, self.border))
 
-            # Display and update frame counter
-            self.text("{0:,}".format(self.runner.lattice.generation))
-            self.text("R:{0}, B:{1}".format(
+            self.text("{0:,} ({1:,}/s) {2}fps".format(
+                lattice.generation, int(gps), int(self.clock.get_fps())))
+
+            self.text("R:{0:,}, B:{1:,}".format(
                 self.runner.lattice.counts[0],
                 self.runner.lattice.counts[2]),
                 bottom=True)
 
+            lattice.lock.release()
             pygame.display.flip()
-            self.clock.tick(60)

@@ -1,4 +1,5 @@
 import argparse
+import pprint
 
 from image_viewer import ImageViewer
 from lattice_runner import LatticeRunner
@@ -69,12 +70,18 @@ def main():
                         help="overall number ratio (number of blue/ total number of cells)",
                         default=1)
 
+    parser.add_argument("--updateRate",
+                        type=int,
+                        help="Rate at which display is updated (Hz)",
+                        default=60)
+
     args = parser.parse_args()
 
-    print(vars(args))
+    pprint.pprint(vars(args))
     runner = LatticeRunner(args)
     viewer = ImageViewer(width=args.size,
                          height=args.size,
+                         updateRate=args.updateRate,
                          runner=runner)
     print("Hit ESC to abort")
     runner.start()

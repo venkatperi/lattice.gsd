@@ -4,11 +4,7 @@ def int2color(x):
     :param x: int
     :return: RGB
     """
-    r = (1000 * x % 255)
-    g = int(10000 * x % 255)
-    b = int(100000 * x % 255)
-    # return b << 16 + g << 8 + r
-    return [r, g, b]
+    return [(1000 * x % 255), int(10000 * x % 255), int(100000 * x % 255)]
 
 
 def int2color_tuple(x):

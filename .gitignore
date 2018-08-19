@@ -3,3 +3,5 @@ venv
 pip-selfcheck.json
 .Python
 *.pyc
+.txt
+*.prof

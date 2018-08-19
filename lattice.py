@@ -6,6 +6,7 @@ Created on Sat Dec  3 10:51:05 2016
 @author: dyanni3
 """
 # %% imports and prep
+from threading import Lock
 
 import numpy as np
 from numpy.random import rand as r
@@ -72,6 +73,7 @@ class Lattice(object):
         self.numRatio = numRatio
         self.size = size
         self.generation = 0
+        self.lock = Lock()
 
         self.counts = (0, 0, 0)  # number of red, blue, green pixels
 
@@ -79,6 +81,7 @@ class Lattice(object):
             self.x, self.y = size[1], size[0]
         except TypeError:
             self.x, self.y = size, size
+        self.rgb_image = np.empty((self.x, self.y, 3), dtype=np.uint8)
 
         # if defective killers set to true then there's no random death either
         # (no killing, no random death)
@@ -120,10 +123,15 @@ class Lattice(object):
             killdict[0] = 0
             self.killdict = killdict
 
-    def evolve(self, n_steps):  # main function, moves the lattice forward n steps in time
+    def evolve(self, n_steps=1):
+        """
+        main function, moves the lattice forward n steps in time
+
+        :param n_steps:
+        """
+        self.lock.acquire()
         self.generation += 1
         for t in range(n_steps):
-
             # pick lattice site
             try:
                 j = np.random.randint(1, self.y - 2)
@@ -219,21 +227,27 @@ class Lattice(object):
                             self.lattice[i, j] = np.random.choice(choices, p=choices2)
                             # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
 
+        self.lock.release()
+
     def to_rgb_image(self):
         """
         Convert lattice to a list of RGB tuples
 
         """
         r, g, b = (0, 0, 0)
-        img = np.empty((self.x, self.y, 3), dtype=np.uint8)
+        # img = np.empty((self.x, self.y, 3), dtype=np.uint8)
+        # self.lock.acquire()
         for i in range(self.x):
             for j in range(self.y):
-                pix = img[i, j] = int2color(self.lattice[i, j])
+                x = self.lattice[i, j]
+                pix = [(1000 * x % 255), int(10000 * x % 255), int(100000 * x % 255)]
+                self.rgb_image[i, j] = pix
                 r += 1 if pix[0] > 100 else 0
                 g += 1 if pix[1] > 100 else 0
                 b += 1 if pix[2] > 100 else 0
         self.counts = (r, g, b)
-        return img
+        # self.lock.release()
+        return self.rgb_image
 
     def view(self):
         """
