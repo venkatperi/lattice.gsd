@@ -2,3 +2,4 @@ venv
 .idea
 pip-selfcheck.json
 .Python
+*.pyc

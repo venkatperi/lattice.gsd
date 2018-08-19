@@ -11,31 +11,12 @@ import numpy as np
 from numpy.random import rand as r
 from collections import defaultdict as d, defaultdict
 from PIL import Image
-import argparse
+from functools import reduce
+
+from util import int2color, int2color_tuple, count_colors
 
 RED = 0.2295
 BLUE = 0.00254
-
-
-def int2color(x):
-    """
-    converts lattice integer to RGB tuple
-
-    :param x: int
-
-    :return: RGB
-    """
-    red_val = int(1000 * x % 255)
-    green_val = int(10000 * x % 255)
-    blue_val = int(100000 * x % 255)
-    return red_val, green_val, blue_val
-
-
-def count_colors(total, current):
-    for i in range(0, 3):
-        if current[i] > 100:
-            total[i] += 1
-    return total
 
 
 class Lattice(object):
@@ -90,6 +71,7 @@ class Lattice(object):
         self.density = density
         self.numRatio = numRatio
         self.size = size
+        self.generation = 0
 
         try:
             self.x, self.y = size[1], size[0]
@@ -105,19 +87,20 @@ class Lattice(object):
         # chosen randomly according to numRatio and density
         if onlyRedBlue:
             self.lattice = np.random.choice(
-                    [RED, BLUE],
-                    size=(self.x, self.y))
+                [RED, BLUE],
+                size=(self.x, self.y))
 
             try:
                 if density != 1:
                     self.lattice = np.random.choice(
-                            [0, RED, BLUE],
-                            p=[1 - density, density * (1 - numRatio), density * numRatio],
-                            size=(self.x, self.y))
+                        [0, RED, BLUE],
+                        p=[1 - density, density * (1 - numRatio), density * numRatio],
+                        size=(self.x, self.y))
             except ValueError:
                 print("Density should be an integer or float")
 
-        # initialize the lattice with a bunch of different types of cells (represented as different colors)
+        # initialize the lattice with a bunch of different types of cells
+        # (represented as different colors)
         else:
             self.lattice = r(self.x, self.y)
             if density != 1:
@@ -136,6 +119,7 @@ class Lattice(object):
             self.killdict = killdict
 
     def evolve(self, n_steps):  # main function, moves the lattice forward n steps in time
+        self.generation += 1
         for t in range(n_steps):
 
             # pick lattice site
@@ -150,7 +134,7 @@ class Lattice(object):
             # random death happens if slider>random float in [0,1]
             if self.slider > r():
                 self.lattice[i, j] = np.random.choice(np.ravel(
-                        self.lattice[i - 1:i + 2, j - 1:j + 2]))
+                    self.lattice[i - 1:i + 2, j - 1:j + 2]))
 
             # else killing/filling a la IBM happens
             else:
@@ -164,7 +148,7 @@ class Lattice(object):
 
                 # total number of differently colored cells in neighborhood
                 n_enemy = np.size(
-                        neighborhood[neighborhood != self.lattice[i, j]])
+                    neighborhood[neighborhood != self.lattice[i, j]])
 
                 # KILLING..........##########
 
@@ -178,7 +162,8 @@ class Lattice(object):
                     if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
                         self.lattice[i, j] = 0
 
-                elif self.onlyRedBlue and self.lattice[i, j] == BLUE:  # site is filled with a blue bacteria
+                elif self.onlyRedBlue and self.lattice[
+                    i, j] == BLUE:  # site is filled with a blue bacteria
                     if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
                         self.lattice[i, j] = 0  # kill this bacteria
 
@@ -219,7 +204,8 @@ class Lattice(object):
                                 self.lattice[i, j] = 0
                                 continue
 
-                            # fill with one of the other colors in neighborhood (according to number of cells)
+                            # fill with one of the other colors in neighborhood
+                            # (according to number of cells)
                             choices = list(choices)
                             choices2 = [choice * (1 - self.killdict[choice]) for choice in choices]
                             choices2 = [choice / len(choices2) for choice in choices2]
@@ -231,6 +217,17 @@ class Lattice(object):
                             self.lattice[i, j] = np.random.choice(choices, p=choices2)
                             # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
 
+    def to_rgb_image(self):
+        """
+        Convert lattice to a list of RGB tuples
+
+        """
+        img = np.empty((self.x, self.y, 3), dtype=np.uint8)
+        for i in range(self.x):
+            for j in range(self.y):
+                img[i, j] = int2color(self.lattice[i, j])
+        return img
+
     def view(self):
         """
         Convert lattice to an image
@@ -238,7 +235,7 @@ class Lattice(object):
         :return:
         RGB image of the lattice
         """
-        lu = list(map(int2color, np.ravel(self.lattice[:, :])))
+        lu = list(map(int2color_tuple, np.ravel(self.lattice[:, :])))
         imu = Image.new('RGB', [self.lattice.shape[1], self.lattice.shape[0]])
         imu.putdata(lu)
 
@@ -250,25 +247,3 @@ class Lattice(object):
         return imu
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-s", "--size",
-                    type=int,
-                    help="Size of the lattice (size x size)",
-                    default=100)
-
-parser.add_argument("-e", "--evolutions",
-                    type=int,
-                    help="Number of times the lattice evolves",
-                    default=0)
-
-args = parser.parse_args()
-
-print "Lattice size is: %d\nNumber of evolutions is: %d" % (args.size, args.evolutions)
-
-my_lattice = Lattice(size=args.size, slider=0, onlyRedBlue=True, numRatio=20, deathRate=100000)
-for iteration in range(0, args.evolutions):
-    my_lattice.evolve(1)
-
-# my_lattice.view()
-im = my_lattice.view()
-im.show()
