@@ -16,8 +16,10 @@ from functools import reduce
 
 from util import int2color, int2color_tuple, count_colors
 
-RED = 0.2295
-BLUE = 0.00254
+# RED = 0.2295
+RED = 0.1841900
+# BLUE = 0.00254
+BLUE = 0.01254
 
 
 class Lattice(object):
@@ -240,7 +242,8 @@ class Lattice(object):
         for i in range(self.x):
             for j in range(self.y):
                 x = self.lattice[i, j]
-                pix = [(1000 * x % 255), int(10000 * x % 255), int(100000 * x % 255)]
+                # pix = [(1000 * x % 255), int(10000 * x % 255), int(100000 * x % 255)]
+                pix = int2color(x)
                 self.rgb_image[i, j] = pix
                 r += 1 if pix[0] > 100 else 0
                 g += 1 if pix[1] > 100 else 0
