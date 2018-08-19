@@ -9,9 +9,18 @@ class LatticeRunner(Thread):
     def __init__(self, args):
         Thread.__init__(self)
         self.args = args
-        self.lattice = Lattice(size=args.size, slider=0,
-                               onlyRedBlue=True, numRatio=20,
+        self.lattice = Lattice(size=args.size,
+                               slider=args.slider,
+                               onlyRedBlue=args.onlyRedBlue,
+                               defKillers=args.defKillers,
+                               density=args.density,
+                               numRatio=args.numRatio,
+                               redAdvantage=args.redAdvantage,
+                               blueAdvantage=args.blueAdvantage,
+                               redGrowth=args.redGrowth,
+                               blueGrowth=args.blueGrowth,
                                deathRate=100000)
+
         self.args = args
         self.quit = False
 
