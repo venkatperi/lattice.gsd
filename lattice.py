@@ -73,6 +73,8 @@ class Lattice(object):
         self.size = size
         self.generation = 0
 
+        self.counts = (0, 0, 0)  # number of red, blue, green pixels
+
         try:
             self.x, self.y = size[1], size[0]
         except TypeError:
@@ -222,10 +224,15 @@ class Lattice(object):
         Convert lattice to a list of RGB tuples
 
         """
+        r, g, b = (0, 0, 0)
         img = np.empty((self.x, self.y, 3), dtype=np.uint8)
         for i in range(self.x):
             for j in range(self.y):
-                img[i, j] = int2color(self.lattice[i, j])
+                pix = img[i, j] = int2color(self.lattice[i, j])
+                r += 1 if pix[0] > 100 else 0
+                g += 1 if pix[1] > 100 else 0
+                b += 1 if pix[2] > 100 else 0
+        self.counts = (r, g, b)
         return img
 
     def view(self):
@@ -245,5 +252,3 @@ class Lattice(object):
             return imu
 
         return imu
-
-

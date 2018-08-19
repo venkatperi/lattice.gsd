@@ -11,7 +11,7 @@ class LatticeRunner(Thread):
         self.args = args
         self.lattice = Lattice(size=args.size,
                                slider=args.slider,
-                               onlyRedBlue=args.onlyRedBlue,
+                               onlyRedBlue=not args.any,
                                defKillers=args.defKillers,
                                density=args.density,
                                numRatio=args.numRatio,

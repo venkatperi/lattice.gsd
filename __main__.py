@@ -29,10 +29,10 @@ def main():
                              "'random death' and for a range between it's a mixture. Default 0.",
                         default=0)
 
-    parser.add_argument("--onlyRedBlue",
+    parser.add_argument("--any",
                         action="store_true",
-                        help="If set, the lattice contains only red and blue bacteria",
-                        default=False)
+                        help="If set, the lattice contains any, otherwise only red and blue "
+                             "bacteria")
 
     parser.add_argument("--redAdvantage",
                         type=float,
@@ -71,7 +71,7 @@ def main():
 
     args = parser.parse_args()
 
-    print(args)
+    print(vars(args))
     runner = LatticeRunner(args)
     viewer = ImageViewer(width=args.size,
                          height=args.size,
