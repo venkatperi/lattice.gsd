@@ -4,13 +4,17 @@ def int2color(x):
     :param x: int
     :return: RGB
     """
-    r = int(1000 * x % 255)
-    g = int(10000 * x % 255)
-    b = int(100000 * x % 255)
+    # r = int(1000 * x % 255)
+    # g = int(10000 * x % 255)
+    # b = int(100000 * x % 255)
+    x = 0 if x == 0 else int(1/x)
+    b = x & 0xff
+    g = (x >> 8) & 0xff
+    r = (x >> 16) & 0xff
     return [r, g, b]
 
 
-def hasColors(pix):
+def has_colors(pix):
     return (1 if pix[0] > 100 else 0,
             1 if pix[1] > 100 else 0,
             1 if pix[2] > 100 else 0)

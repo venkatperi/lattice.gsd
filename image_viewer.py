@@ -60,7 +60,6 @@ class ImageViewer(object):
                         return
 
             lattice = self.runner.lattice
-            lattice.lock.acquire()
 
             # diff = lattice.generation - self.prevGeneration
             self.prevGeneration = lattice.generation
@@ -72,12 +71,15 @@ class ImageViewer(object):
             surface = pygame.surfarray.make_surface(lattice.rgb_image)
             self.screen.blit(surface, (self.border, self.border))
 
-            self.text("{0:,} {1}fps".format(lattice.generation, int(self.clock.get_fps())))
+            self.text("{0:#7,} | {1}fps".format(lattice.generation, int(self.clock.get_fps())))
 
-            self.text("R:{0:,}, B:{1:,}".format(
+            total = lattice.x * lattice.y
+            ratio = 1 if lattice.counts[2] == 0 else lattice.counts[0] / lattice.counts[2]
+            self.text("R:{:,} | B:{:,} | R/B:{:.3f} | Rest:{:.3f}".format(
                 lattice.counts[0],
-                lattice.counts[2]),
+                lattice.counts[2],
+                ratio,
+                (total - (lattice.counts[0] + lattice.counts[2])) / total),
                 bottom=True)
 
-            lattice.lock.release()
             pygame.display.flip()

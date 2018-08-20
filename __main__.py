@@ -61,12 +61,12 @@ def main():
                              "each other.")
 
     parser.add_argument("--density",
-                        type=float,
+                        type=zero_to_one,
                         help="overall cell density at initialization of the lattice.",
                         default=1)
 
     parser.add_argument("--numRatio",
-                        type=float,
+                        type=zero_to_one,
                         help="overall number ratio (number of blue/ total number of cells)",
                         default=1)
 

@@ -14,12 +14,15 @@ from collections import defaultdict as d, defaultdict
 from PIL import Image
 from functools import reduce
 
-from util import int2color, int2color_tuple, count_colors, hasColors
+from util import int2color, int2color_tuple, count_colors, has_colors
 
 # RED = 0.2295
-RED = 0.1841900
+# RED = 0.1841900
 # BLUE = 0.00254
-BLUE = 0.01254
+# BLUE = 0.01234
+
+RED = 1.0 / float(0xe41a1c)
+BLUE = 1.0 / float(0x377eb8)
 
 
 class Lattice(object):
@@ -83,6 +86,7 @@ class Lattice(object):
             self.x, self.y = size[1], size[0]
         except TypeError:
             self.x, self.y = size, size
+
         self.rgb_image = np.empty((self.x, self.y, 3), dtype=np.uint8)
 
         # if defective killers set to true then there's no random death either
@@ -90,48 +94,56 @@ class Lattice(object):
         if defKillers:
             self.slider = 0
 
-        # initialize the lattice to contain only red and blue cells and empty sites,
-        # chosen randomly according to numRatio and density
-        if onlyRedBlue:
-            self.lattice = np.random.choice(
-                [RED, BLUE],
-                size=(self.x, self.y))
-
-            try:
-                if density != 1:
-                    self.lattice = np.random.choice(
-                        [0, RED, BLUE],
-                        p=[1 - density, density * (1 - numRatio), density * numRatio],
-                        size=(self.x, self.y))
-            except ValueError:
-                print("Density should be an integer or float")
-
-        # initialize the lattice with a bunch of different types of cells
-        # (represented as different colors)
-        else:
-            self.lattice = r(self.x, self.y)
-            if density != 1:
-                for bug in np.ravel(self.lattice):
-                    if r() > density:
-                        self.lattice[self.lattice == bug] = 0
-
-            # killdict is a hashtable containing the killing effectiveness for each color
-            killdict = d(list)  # type: defaultdict[Any, float]
-            killdict[0] = 0
-
-            for color in np.ravel(self.lattice):
-                killdict[color] = r()
-
-            killdict[0] = 0
-            self.killdict = killdict
+        self.lattice, self.killdict = self.create_red_blue_lattice(density, numRatio) \
+            if onlyRedBlue else \
+            self.create_other_lattice(density)
 
         self.to_rgb_image()
 
+    def create_other_lattice(self, density):
+        """
+        initialize the lattice with a bunch of different types of cells
+        (represented as different colors)
+        :param density:
+        """
+        lattice = r(self.x, self.y)
+        if density != 1:
+            for bug in np.ravel(lattice):
+                if r() > density:
+                    lattice[lattice == bug] = 0
+        # killdict is a hashtable containing the killing effectiveness for each color
+        killdict = d(list)  # type: defaultdict[Any, float]
+        killdict[0] = 0
+        for color in np.ravel(lattice):
+            killdict[color] = r()
+        killdict[0] = 0
+        return lattice, killdict
+
+    def create_red_blue_lattice(self, density, numRatio):
+        """
+        initialize the lattice to contain only red and blue cells and empty sites,
+        chosen randomly according to numRatio and density
+        :param density:
+        :param numRatio:
+        :return:
+        """
+        try:
+            if density != 1:
+                return np.random.choice(
+                    [0, RED, BLUE],
+                    p=[1.0 - density, density * (1.0 - numRatio), density * numRatio],
+                    size=(self.x, self.y)), None
+            else:
+                return np.random.choice([RED, BLUE], size=(self.x, self.y)), None
+        except ValueError:
+            print("ERROR: Density should be an integer or float")
+            exit(-1)
+
     def set(self, i, j, value):
         self.lattice[i, j] = value
-        prev = hasColors(self.rgb_image[i, j])
+        prev = has_colors(self.rgb_image[i, j])
         self.rgb_image[i, j] = int2color(value)
-        x = hasColors(self.rgb_image[i, j])
+        x = has_colors(self.rgb_image[i, j])
         c = self.counts
         self.counts = (c[0] + x[0] - prev[0],
                        c[1] + x[1] - prev[1],
@@ -143,36 +155,19 @@ class Lattice(object):
 
         :param n_steps:
         """
-        self.lock.acquire()
-        self.generation += 1
         for t in range(n_steps):
+            self.generation += 1
+
             # pick lattice site
-            try:
-                j = np.random.randint(1, self.y - 2)
-                i = np.random.randint(1, self.x - 2)
-            except ValueError:
-                # this will happen if you've chosen your lattice to be one dimensional
-                i = 0
-                j = np.random.randint(0, self.y - 1)
+            i, j = self.random_site()
 
             # random death happens if slider>random float in [0,1]
             if self.slider > r():
-                self.set(i, j, np.random.choice(np.ravel(
-                    self.lattice[i - 1:i + 2, j - 1:j + 2])))
+                self.random_death(i, j)
 
             # else killing/filling a la IBM happens
             else:
-                # get the neighborhood of the ith,jth 'pixel'
-                neighborhood = self.lattice[i - 1:i + 2, j - 1:j + 2]
-
-                # find number of species one (red, RED),
-                # species two (blue, BLUE)
-                n_blue = np.size(neighborhood[neighborhood == BLUE])
-                n_red = np.size(neighborhood[neighborhood == RED])
-
-                # total number of differently colored cells in neighborhood
-                n_enemy = np.size(
-                    neighborhood[neighborhood != self.lattice[i, j]])
+                n_blue, n_enemy, n_red, neighborhood = self.get_neighborhood(i, j)
 
                 # KILLING..........##########
 
@@ -180,68 +175,127 @@ class Lattice(object):
                 thresh = 0.5 if self.x == 1 else 2
 
                 # site is filled with red bact
-                if self.onlyRedBlue and self.lattice[i, j] == RED:
-                    # if number of blue cells * their killing advantage * random number > 2,
-                    # kill this red bacteria (replace with empty site)
-                    if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
-                        self.set(i, j, 0)
+                if self.onlyRedBlue and self.is_red(i, j):
+                    self.kill_red(i, j, n_blue, thresh)
 
-                elif self.onlyRedBlue and self.lattice[
-                    i, j] == BLUE:  # site is filled with a blue bacteria
-                    if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
-                        self.set(i, j, 0)  # kill this bacteria
+                # site is filled with a blue bacteria
+                elif self.onlyRedBlue and self.is_blue(i, j):
+                    self.kill_blue(i, j, n_red, thresh)
 
-                # site is not empty and has neighbors (non-specific neighbors, different color)
-                elif n_enemy > 0 and self.lattice[i, j] != 0:
-                    enemy_weight = 0
-                    for enemy in np.ravel(neighborhood):
-                        if enemy != 0 and enemy != self.lattice[i, j]:
-                            try:
-                                enemy_weight += self.killdict[enemy]
-                            except TypeError:
-                                print("ERROR")
-                                pass
-                                # enemy_weight=enemy_weight+self.killdict[enemy][0];
-
-                    # if enough enemies, kill this bacterium
-                    if enemy_weight * r() > 2:
-                        self.set(i, j, 0)
+                elif n_enemy > 0 and not self.is_empty(i, j):
+                    if self.enough_enemies(i, j, neighborhood):
+                        self.kill(i, j)
 
                     # FILLING ....... #########
-                    elif self.lattice[i, j] == 0:  # site is empty
-                        # fill with either red or blue
+                    elif self.is_empty(i, j):
                         if self.onlyRedBlue and n_red + n_blue > 0:
-                            if ((n_red * self.redGrowth + n_blue * self.blueGrowth) * r()) > 2:
-                                if n_red * self.redGrowth * r() > n_blue * self.blueGrowth * r():
-                                    self.set(i, j, RED)
-                                else:
-                                    self.set(i, j, BLUE)
-                            else:
-                                self.set(i, j, 0)
+                            self.fill_red_or_blue(i, j, n_blue, n_red)
 
                         elif n_enemy > 0:
-                            # find all the other colors in neighborhood
-                            choices = np.ravel(neighborhood[neighborhood != 0])
-
-                            # if no other cells in neighborhood then stay empty
-                            if choices.size == 0:
-                                self.set(i, j, 0)
+                            if not self.fill_with_neighbor_color(i, j, neighborhood):
                                 continue
 
-                            # fill with one of the other colors in neighborhood
-                            # (according to number of cells)
-                            choices = list(choices)
-                            choices2 = [choice * (1 - self.killdict[choice]) for choice in choices]
-                            choices2 = [choice / len(choices2) for choice in choices2]
-                            zeroprob = 1 - sum(choices2)
-                            choices2.append(zeroprob)
-                            choices2 = np.array(choices2)
-                            choices.append(0)
-                            choices = np.array(choices)
-                            self.set(i, j, np.random.choice(choices, p=choices2))
-                            # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
+    def get_neighborhood(self, i, j):
+        # get the neighborhood of the ith,jth 'pixel'
+        neighborhood = self.lattice[i - 1:i + 2, j - 1:j + 2]
+        # find number of species one (red, RED),
+        # species two (blue, BLUE)
+        n_blue = np.size(neighborhood[neighborhood == BLUE])
+        n_red = np.size(neighborhood[neighborhood == RED])
+        # total number of differently colored cells in neighborhood
+        n_enemy = np.size(neighborhood[neighborhood != self.lattice[i, j]])
+        return n_blue, n_enemy, n_red, neighborhood
 
-        self.lock.release()
+    def is_empty(self, i, j):
+        return self.lattice[i, j] == 0
+
+    def is_red(self, i, j):
+        return self.lattice[i, j] == RED
+
+    def is_blue(self, i, j):
+        return self.lattice[i, j] == BLUE
+
+    def fill_red_or_blue(self, i, j, n_blue, n_red):
+        if ((n_red * self.redGrowth + n_blue * self.blueGrowth) * r()) > 2:
+            if n_red * self.redGrowth * r() > n_blue * self.blueGrowth * r():
+                self.set(i, j, RED)
+            else:
+                self.set(i, j, BLUE)
+        else:
+            self.kill(i, j)
+
+    def fill_with_neighbor_color(self, i, j, neighborhood):
+        # find all the other colors in neighborhood
+        choices = np.ravel(neighborhood[neighborhood != 0])
+        # if no other cells in neighborhood then stay empty
+        if choices.size == 0:
+            self.kill(i, j)
+            return False
+
+        # fill with one of the other colors in neighborhood
+        # (according to number of cells)
+        choices = list(choices)
+        choices2 = [choice * (1 - self.killdict[choice]) for choice in choices]
+        choices2 = [choice / len(choices2) for choice in choices2]
+        zeroprob = 1 - sum(choices2)
+        choices2.append(zeroprob)
+        choices2 = np.array(choices2)
+        choices.append(0)
+        choices = np.array(choices)
+        self.set(i, j, np.random.choice(choices, p=choices2))
+        # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
+        return True
+
+    def kill_blue(self, i, j, n_red, thresh):
+        if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
+            self.set(i, j, 0)
+
+            # site is not empty and has neighbors (non-specific neighbors, different color)
+
+    def kill_red(self, i, j, n_blue, thresh):
+        """
+        if number of blue cells * their killing advantage * random number > 2,
+        kill this red bacteria (replace with empty site)
+        :param i:
+        :param j:
+        :param n_blue:
+        :param thresh:
+        """
+        if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
+            self.kill(i, j)
+
+    def enough_enemies(self, i, j, neighborhood):
+        enemy_weight = self.get_enemy_weight(i, j, neighborhood)
+        return enemy_weight * r() > 2
+
+    def get_enemy_weight(self, i, j, neighborhood):
+        enemy_weight = 0
+        for enemy in np.ravel(neighborhood):
+            if enemy != 0 and enemy != self.lattice[i, j]:
+                try:
+                    enemy_weight += self.killdict[enemy]
+                except TypeError:
+                    print("ERROR")
+                    pass
+                    # enemy_weight=enemy_weight+self.killdict[enemy][0];
+        return enemy_weight
+
+    def kill(self, i, j):
+        self.set(i, j, 0)
+
+    def random_death(self, i, j):
+        self.set(i, j, np.random.choice(np.ravel(
+            self.lattice[i - 1:i + 2, j - 1:j + 2])))
+
+    def random_site(self):
+        try:
+            j = np.random.randint(1, self.y - 2)
+            i = np.random.randint(1, self.x - 2)
+        except ValueError:
+            # this will happen if you've chosen your lattice to be one dimensional
+            i = 0
+            j = np.random.randint(0, self.y - 1)
+        return i, j
 
     def to_rgb_image(self):
         """
@@ -250,7 +304,6 @@ class Lattice(object):
         """
         r, g, b = (0, 0, 0)
         # img = np.empty((self.x, self.y, 3), dtype=np.uint8)
-        # self.lock.acquire()
         for i in range(self.x):
             for j in range(self.y):
                 x = self.lattice[i, j]
@@ -261,7 +314,6 @@ class Lattice(object):
                 g += 1 if pix[1] > 100 else 0
                 b += 1 if pix[2] > 100 else 0
         self.counts = (r, g, b)
-        # self.lock.release()
         return self.rgb_image
 
     def view(self):
