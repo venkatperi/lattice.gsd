@@ -31,7 +31,7 @@ class ImageViewer(object):
         self.done = False
         self.autoStop = autoStop
         self.prevGeneration = 0
-        self.average = StreamingMovingAverage(100)
+        # self.average = StreamingMovingAverage(100)
 
         # clear screen
         self.screen.fill(BG_COLOR)
@@ -62,22 +62,21 @@ class ImageViewer(object):
             lattice = self.runner.lattice
             lattice.lock.acquire()
 
-            diff = lattice.generation - self.prevGeneration
+            # diff = lattice.generation - self.prevGeneration
             self.prevGeneration = lattice.generation
-            average, gps = self.average.process(diff, pygame.time.get_ticks())
+            # average, gps = self.average.process(diff, pygame.time.get_ticks())
 
             self.clock.tick(self.updateRate)
             self.screen.fill(BG_COLOR)
 
-            surface = pygame.surfarray.make_surface(lattice.to_rgb_image())
+            surface = pygame.surfarray.make_surface(lattice.rgb_image)
             self.screen.blit(surface, (self.border, self.border))
 
-            self.text("{0:,} ({1:,}/s) {2}fps".format(
-                lattice.generation, int(gps), int(self.clock.get_fps())))
+            self.text("{0:,} {1}fps".format(lattice.generation, int(self.clock.get_fps())))
 
             self.text("R:{0:,}, B:{1:,}".format(
-                self.runner.lattice.counts[0],
-                self.runner.lattice.counts[2]),
+                lattice.counts[0],
+                lattice.counts[2]),
                 bottom=True)
 
             lattice.lock.release()

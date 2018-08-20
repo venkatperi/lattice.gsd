@@ -10,6 +10,12 @@ def int2color(x):
     return [r, g, b]
 
 
+def hasColors(pix):
+    return (1 if pix[0] > 100 else 0,
+            1 if pix[1] > 100 else 0,
+            1 if pix[2] > 100 else 0)
+
+
 def int2color_tuple(x):
     """
     converts lattice integer to RGB tuple

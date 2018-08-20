@@ -14,7 +14,7 @@ from collections import defaultdict as d, defaultdict
 from PIL import Image
 from functools import reduce
 
-from util import int2color, int2color_tuple, count_colors
+from util import int2color, int2color_tuple, count_colors, hasColors
 
 # RED = 0.2295
 RED = 0.1841900
@@ -125,6 +125,18 @@ class Lattice(object):
             killdict[0] = 0
             self.killdict = killdict
 
+        self.to_rgb_image()
+
+    def set(self, i, j, value):
+        self.lattice[i, j] = value
+        prev = hasColors(self.rgb_image[i, j])
+        self.rgb_image[i, j] = int2color(value)
+        x = hasColors(self.rgb_image[i, j])
+        c = self.counts
+        self.counts = (c[0] + x[0] - prev[0],
+                       c[1] + x[1] - prev[1],
+                       c[2] + x[2] - prev[2])
+
     def evolve(self, n_steps=1):
         """
         main function, moves the lattice forward n steps in time
@@ -145,15 +157,15 @@ class Lattice(object):
 
             # random death happens if slider>random float in [0,1]
             if self.slider > r():
-                self.lattice[i, j] = np.random.choice(np.ravel(
-                    self.lattice[i - 1:i + 2, j - 1:j + 2]))
+                self.set(i, j, np.random.choice(np.ravel(
+                    self.lattice[i - 1:i + 2, j - 1:j + 2])))
 
             # else killing/filling a la IBM happens
             else:
                 # get the neighborhood of the ith,jth 'pixel'
                 neighborhood = self.lattice[i - 1:i + 2, j - 1:j + 2]
 
-                # find number of species one (red, RED), 
+                # find number of species one (red, RED),
                 # species two (blue, BLUE)
                 n_blue = np.size(neighborhood[neighborhood == BLUE])
                 n_red = np.size(neighborhood[neighborhood == RED])
@@ -172,12 +184,12 @@ class Lattice(object):
                     # if number of blue cells * their killing advantage * random number > 2,
                     # kill this red bacteria (replace with empty site)
                     if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
-                        self.lattice[i, j] = 0
+                        self.set(i, j, 0)
 
                 elif self.onlyRedBlue and self.lattice[
                     i, j] == BLUE:  # site is filled with a blue bacteria
                     if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
-                        self.lattice[i, j] = 0  # kill this bacteria
+                        self.set(i, j, 0)  # kill this bacteria
 
                 # site is not empty and has neighbors (non-specific neighbors, different color)
                 elif n_enemy > 0 and self.lattice[i, j] != 0:
@@ -193,7 +205,7 @@ class Lattice(object):
 
                     # if enough enemies, kill this bacterium
                     if enemy_weight * r() > 2:
-                        self.lattice[i, j] = 0
+                        self.set(i, j, 0)
 
                     # FILLING ....... #########
                     elif self.lattice[i, j] == 0:  # site is empty
@@ -201,11 +213,11 @@ class Lattice(object):
                         if self.onlyRedBlue and n_red + n_blue > 0:
                             if ((n_red * self.redGrowth + n_blue * self.blueGrowth) * r()) > 2:
                                 if n_red * self.redGrowth * r() > n_blue * self.blueGrowth * r():
-                                    self.lattice[i, j] = RED
+                                    self.set(i, j, RED)
                                 else:
-                                    self.lattice[i, j] = BLUE
+                                    self.set(i, j, BLUE)
                             else:
-                                self.lattice[i, j] = 0
+                                self.set(i, j, 0)
 
                         elif n_enemy > 0:
                             # find all the other colors in neighborhood
@@ -213,7 +225,7 @@ class Lattice(object):
 
                             # if no other cells in neighborhood then stay empty
                             if choices.size == 0:
-                                self.lattice[i, j] = 0
+                                self.set(i, j, 0)
                                 continue
 
                             # fill with one of the other colors in neighborhood
@@ -226,7 +238,7 @@ class Lattice(object):
                             choices2 = np.array(choices2)
                             choices.append(0)
                             choices = np.array(choices)
-                            self.lattice[i, j] = np.random.choice(choices, p=choices2)
+                            self.set(i, j, np.random.choice(choices, p=choices2))
                             # self.lattice[i,j]=np.random.choice(np.ravel(neighborhood[neighborhood!=0]))
 
         self.lock.release()
