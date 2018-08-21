@@ -1,6 +1,6 @@
 import pygame
 
-from StreamingMovingAverage import StreamingMovingAverage
+from MovingAverageWithRate import MovingAverageWithRate
 
 BG_COLOR = (20, 20, 20)
 FONT_NAME = "font/RobotoMono-Regular.ttf"
@@ -30,8 +30,7 @@ class ImageViewer(object):
         self.frame_count = 0
         self.done = False
         self.autoStop = autoStop
-        self.prevGeneration = 0
-        # self.average = StreamingMovingAverage(100)
+        self.fps = MovingAverageWithRate(1000)
 
         # clear screen
         self.screen.fill(BG_COLOR)
@@ -61,17 +60,15 @@ class ImageViewer(object):
 
             lattice = self.runner.lattice
 
-            # diff = lattice.generation - self.prevGeneration
-            self.prevGeneration = lattice.generation
-            # average, gps = self.average.process(diff, pygame.time.get_ticks())
-
-            self.clock.tick(self.updateRate)
             self.screen.fill(BG_COLOR)
 
             surface = pygame.surfarray.make_surface(lattice.rgb_image)
             self.screen.blit(surface, (self.border, self.border))
 
-            self.text("{0:#7,} | {1}fps".format(lattice.generation, int(self.clock.get_fps())))
+            x, fps = self.fps.add(1, pygame.time.get_ticks())
+            self.text("{0:#7,} | {1}fps".format(
+                lattice.generation,
+                int(fps)))
 
             total = lattice.x * lattice.y
             ratio = 1 if lattice.counts[2] == 0 else lattice.counts[0] / lattice.counts[2]
@@ -81,5 +78,8 @@ class ImageViewer(object):
                 ratio,
                 (total - (lattice.counts[0] + lattice.counts[2])) / total),
                 bottom=True)
+
+            self.frame_count += 1
+            self.clock.tick(self.updateRate)
 
             pygame.display.flip()

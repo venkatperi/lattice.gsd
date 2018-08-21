@@ -25,6 +25,9 @@ RED = 1.0 / float(0xe41a1c)
 BLUE = 1.0 / float(0x377eb8)
 
 
+# BLUE = 1.0  / 0x4daf4a
+
+
 class Lattice(object):
     def __init__(self, size=100, slider=0, onlyRedBlue=False,
                  redAdvantage=1, blueAdvantage=1, defKillers=False, density=1,
@@ -140,6 +143,13 @@ class Lattice(object):
             exit(-1)
 
     def set(self, i, j, value):
+        """
+        Sets lattice value at pixel (i,j). Also updates rgb_image(i,j)
+        as well as red/blue counts.
+        :param i:
+        :param j:
+        :param value:
+        """
         self.lattice[i, j] = value
         prev = has_colors(self.rgb_image[i, j])
         self.rgb_image[i, j] = int2color(value)
@@ -159,7 +169,7 @@ class Lattice(object):
             self.generation += 1
 
             # pick lattice site
-            i, j = self.random_site()
+            i, j = self.random_site
 
             # random death happens if slider>random float in [0,1]
             if self.slider > r():
@@ -167,23 +177,19 @@ class Lattice(object):
 
             # else killing/filling a la IBM happens
             else:
-                n_blue, n_enemy, n_red, neighborhood = self.get_neighborhood(i, j)
-
-                # KILLING..........##########
-
-                # if your lattice is one dimensional
-                thresh = 0.5 if self.x == 1 else 2
+                n_blue, n_enemy, n_red, neighborhood = \
+                    self.get_neighborhood(i, j)
 
                 # site is filled with red bact
                 if self.onlyRedBlue and self.is_red(i, j):
-                    self.kill_red(i, j, n_blue, thresh)
+                    self.kill_red(i, j, n_blue, self.thresh)
 
                 # site is filled with a blue bacteria
                 elif self.onlyRedBlue and self.is_blue(i, j):
-                    self.kill_blue(i, j, n_red, thresh)
+                    self.kill_blue(i, j, n_red, self.thresh)
 
                 elif n_enemy > 0 and not self.is_empty(i, j):
-                    if self.enough_enemies(i, j, neighborhood):
+                    if self.has_enough_enemies(i, j, neighborhood):
                         self.kill(i, j)
 
                     # FILLING ....... #########
@@ -194,6 +200,10 @@ class Lattice(object):
                         elif n_enemy > 0:
                             if not self.fill_with_neighbor_color(i, j, neighborhood):
                                 continue
+
+    @property
+    def thresh(self):
+        return 0.5 if self.x == 1 else 2
 
     def get_neighborhood(self, i, j):
         # get the neighborhood of the ith,jth 'pixel'
@@ -250,8 +260,6 @@ class Lattice(object):
         if n_red * r() * self.redAdvantage > thresh and not self.defKillers:
             self.set(i, j, 0)
 
-            # site is not empty and has neighbors (non-specific neighbors, different color)
-
     def kill_red(self, i, j, n_blue, thresh):
         """
         if number of blue cells * their killing advantage * random number > 2,
@@ -264,11 +272,10 @@ class Lattice(object):
         if n_blue * r() * self.blueAdvantage > thresh and not self.defKillers:
             self.kill(i, j)
 
-    def enough_enemies(self, i, j, neighborhood):
-        enemy_weight = self.get_enemy_weight(i, j, neighborhood)
-        return enemy_weight * r() > 2
+    def has_enough_enemies(self, i, j, neighborhood):
+        return self.enemy_weight(i, j, neighborhood) * r() > 2
 
-    def get_enemy_weight(self, i, j, neighborhood):
+    def enemy_weight(self, i, j, neighborhood):
         enemy_weight = 0
         for enemy in np.ravel(neighborhood):
             if enemy != 0 and enemy != self.lattice[i, j]:
@@ -287,6 +294,7 @@ class Lattice(object):
         self.set(i, j, np.random.choice(np.ravel(
             self.lattice[i - 1:i + 2, j - 1:j + 2])))
 
+    @property
     def random_site(self):
         try:
             j = np.random.randint(1, self.y - 2)
@@ -307,12 +315,9 @@ class Lattice(object):
         for i in range(self.x):
             for j in range(self.y):
                 x = self.lattice[i, j]
-                # pix = [(1000 * x % 255), int(10000 * x % 255), int(100000 * x % 255)]
-                pix = int2color(x)
-                self.rgb_image[i, j] = pix
-                r += 1 if pix[0] > 100 else 0
-                g += 1 if pix[1] > 100 else 0
-                b += 1 if pix[2] > 100 else 0
+                self.rgb_image[i, j] = int2color(x)
+                r += 1 if x == RED else 0
+                b += 1 if x == BLUE else 0
         self.counts = (r, g, b)
         return self.rgb_image
 
