@@ -82,7 +82,7 @@ class Lattice(object):
         self.size = size
         self.generation = 0
         self.lock = Lock()
-
+        self.surface = None
         self.counts = (0, 0, 0)  # number of red, blue, green pixels
 
         try:
@@ -152,7 +152,8 @@ class Lattice(object):
         """
         self.lattice[i, j] = value
         prev = has_colors(self.rgb_image[i, j])
-        self.rgb_image[i, j] = int2color(value)
+        color = self.rgb_image[i, j] = int2color(value)
+        self.surface.set_at((i, j), color)
         x = has_colors(self.rgb_image[i, j])
         c = self.counts
         self.counts = (c[0] + x[0] - prev[0],

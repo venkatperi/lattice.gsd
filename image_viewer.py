@@ -32,6 +32,8 @@ class ImageViewer(object):
         self.autoStop = autoStop
         self.fps = MovingAverageWithRate(1000)
 
+        runner.lattice.surface = pygame.surfarray.make_surface(runner.lattice.rgb_image)
+
         # clear screen
         self.screen.fill(BG_COLOR)
 
@@ -51,6 +53,7 @@ class ImageViewer(object):
                 return
 
             for event in pygame.event.get():
+
                 if event.type == pygame.QUIT:
                     self.done = True
                 elif event.type == pygame.KEYDOWN:
@@ -62,13 +65,11 @@ class ImageViewer(object):
 
             self.screen.fill(BG_COLOR)
 
-            surface = pygame.surfarray.make_surface(lattice.rgb_image)
-            self.screen.blit(surface, (self.border, self.border))
+            self.screen.blit(lattice.surface, (self.border, self.border))
 
-            x, fps = self.fps.add(1, pygame.time.get_ticks())
-            self.text("{0:#7,} | {1}fps".format(
-                lattice.generation,
-                int(fps)))
+            x, fps = self.fps.add(1)
+            self.text("{:#7,} | {:.2f}fps".format(
+                lattice.generation, fps))
 
             total = lattice.x * lattice.y
             ratio = 1 if lattice.counts[2] == 0 else lattice.counts[0] / lattice.counts[2]
