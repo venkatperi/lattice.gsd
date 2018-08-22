@@ -11,7 +11,7 @@ TEXT_COLOR = (200, 200, 200)
 class ImageViewer(object):
     def __init__(self, width, height, runner, border=50,
                  updateRate=60,
-                 caption="ImageViewer",
+                 caption=None,
                  autoStop=False):
 
         pygame.init()
@@ -23,7 +23,8 @@ class ImageViewer(object):
         self.screen = pygame.display.set_mode(
             (width + (2 * border), height + (2 * border)),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
-        pygame.display.set_caption(caption)
+
+        pygame.display.set_caption(self.caption)
         self.clock = pygame.time.Clock()
 
         self.font = pygame.font.Font(FONT_NAME, FONT_SIZE)
@@ -36,6 +37,23 @@ class ImageViewer(object):
 
         # clear screen
         self.screen.fill(BG_COLOR)
+
+    @property
+    def lattice(self):
+        return self.runner.lattice
+
+    @property
+    def caption(self):
+        l = self.lattice
+        return "size={:}x{:} {:} slider={:} density={:} ratio={:} adv={:},{:} {:} growth={:},{:}".format(
+            l.x, l.y,
+            "rb!" if l.onlyRedBlue else "",
+            l.slider,
+            l.density, l.numRatio,
+            l.redAdvantage, l.blueAdvantage,
+            "defective" if l.defKillers else "",
+            l.redGrowth, l.blueGrowth
+        )
 
     def text(self, txt, bottom=False):
         w, h = self.font.size(txt)
@@ -53,7 +71,6 @@ class ImageViewer(object):
                 return
 
             for event in pygame.event.get():
-
                 if event.type == pygame.QUIT:
                     self.done = True
                 elif event.type == pygame.KEYDOWN:
